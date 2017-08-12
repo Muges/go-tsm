@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/Muges/tsm/streamer"
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/speaker"
 	"github.com/faiface/beep/wav"
@@ -18,13 +19,13 @@ func main() {
 	filename := os.Args[1]
 
 	// Open and decode wav file
-	f, err := os.Open(filename)
+	file, err := os.Open(filename)
 	if err != nil {
 		fmt.Printf("error: unable to open file \"%s\"\n", filename)
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	s, format, err := wav.Decode(f)
+	stream, format, err := wav.Decode(file)
 	if err != nil {
 		fmt.Printf("error: \"%s\" is not a valid wav file\n", filename)
 		fmt.Println(err)
@@ -36,7 +37,9 @@ func main() {
 	// Create a channel that will be closed at the end of playback
 	done := make(chan struct{})
 
-	speaker.Play(beep.Seq(s, beep.Callback(func() {
+	stretched_stream := streamer.Streamer{Streamer: stream}
+
+	speaker.Play(beep.Seq(stretched_stream, beep.Callback(func() {
 		close(done)
 	})))
 
