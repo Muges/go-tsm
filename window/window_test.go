@@ -18,22 +18,31 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-// Package streamer provides the time-scale modification methods as Streamers,
-// to be used with the beep library (https://github.com/faiface/beep)
-package streamer
+package window
 
-import "github.com/faiface/beep"
+import (
+	"github.com/mjibson/go-dsp/dsputils"
+	"testing"
+)
 
-type Streamer struct {
-	Streamer beep.Streamer
+type hanningTest struct {
+	in  int
+	out []float64
 }
 
-func (s Streamer) Stream(samples [][2]float64) (n int, ok bool) {
-	n, ok = s.Streamer.Stream(samples)
-	return n, ok
+var hanningTests = []hanningTest{
+	{1, []float64{0}},
+	{2, []float64{0, 1}},
+	{3, []float64{0, 0.75, 0.75}},
+	{4, []float64{0, 0.5, 1, 0.5}},
+	{8, []float64{0, 0.14644661, 0.5, 0.85355339, 1, 0.85355339, 0.5, 0.146446611}},
 }
 
-// Err propagates the wrapped Streamer's errors.
-func (s Streamer) Err() error {
-	return s.Streamer.Err()
+func TestHanning(t *testing.T) {
+	for _, v := range hanningTests {
+		out := Hanning(v.in)
+		if !dsputils.PrettyClose(out, v.out) {
+			t.Error("error\ninput:", v.in, "\noutput:", out, "\nexpected:", v.out)
+		}
+	}
 }

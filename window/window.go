@@ -1,4 +1,5 @@
 // Copyright (c) 2017 Muges
+// Copyright (c) 2012 Matt Jibson <matt.jibson@gmail.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -18,22 +19,19 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-// Package streamer provides the time-scale modification methods as Streamers,
-// to be used with the beep library (https://github.com/faiface/beep)
-package streamer
+// Package window provides window functions for digital signal processing.
+package window
 
-import "github.com/faiface/beep"
+import "math"
 
-type Streamer struct {
-	Streamer beep.Streamer
-}
+// Hanning returns a periodic Hannning window of size n.
+func Hanning(n int) []float64 {
+	window := make([]float64, n)
 
-func (s Streamer) Stream(samples [][2]float64) (n int, ok bool) {
-	n, ok = s.Streamer.Stream(samples)
-	return n, ok
-}
+	freq := 2 * math.Pi / float64(n)
+	for k := 0; k < n; k++ {
+		window[k] = 0.5 * (1 - math.Cos(freq*float64(k)))
+	}
 
-// Err propagates the wrapped Streamer's errors.
-func (s Streamer) Err() error {
-	return s.Streamer.Err()
+	return window
 }
