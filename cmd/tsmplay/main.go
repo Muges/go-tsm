@@ -27,22 +27,31 @@ import (
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/speaker"
 	"github.com/faiface/beep/wav"
+	"gopkg.in/alecthomas/kingpin.v2"
 	"os"
 	"time"
 )
 
+var (
+	app = kingpin.New("tsmplay", "Change the speed of a WAV audio file.")
+
+	speed          = app.Flag("speed", "Change the speed by N percents (100 by default).").Short('s').PlaceHolder("N").Int()
+	frameSize      = app.Flag("frame_size", "Set the frame size to N.").Short('f').PlaceHolder("N").Int()
+	synthesisHop   = app.Flag("synthesis_hop", "Set the synthesis hop to N.").PlaceHolder("N").Int()
+	outputFilename = app.Flag("output", "Save the stretched audio to FILENAME instead of playing it.").Short('o').PlaceHolder("FILENAME").String()
+
+	inputFilename = app.Arg("filename", "A wav file.").Required().ExistingFile()
+)
+
 func main() {
 	// Read command-line arguments
-	if len(os.Args) < 2 || len(os.Args) > 3 {
-		fmt.Println("usage: tsmplay filename.wav [output.wav]")
-		os.Exit(1)
-	}
-	inputFilename := os.Args[1]
+	app.HelpFlag.Short('h')
+	kingpin.MustParse(app.Parse(os.Args[1:]))
 
 	// Open and decode wav file
-	inputFile, err := os.Open(inputFilename)
+	inputFile, err := os.Open(*inputFilename)
 	if err != nil {
-		fmt.Printf("error: unable to open file \"%s\"\n", inputFilename)
+		fmt.Printf("error: unable to open file \"%s\"\n", *inputFilename)
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -50,19 +59,31 @@ func main() {
 
 	stream, format, err := wav.Decode(inputFile)
 	if err != nil {
-		fmt.Printf("error: \"%s\" is not a valid wav file\n", inputFilename)
+		fmt.Printf("error: \"%s\" is not a valid wav file\n", *inputFilename)
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	t := tsm.New(2, 128, 128, 256, 256)
+	// Set default values
+	if *speed == 0 {
+		*speed = 100
+	}
+	if *frameSize == 0 {
+		*frameSize = format.SampleRate.N(10 * time.Millisecond)
+	}
+	if *synthesisHop == 0 {
+		*synthesisHop = *frameSize / 4
+	}
+
+	analysisHop := (*synthesisHop * *speed) / 100
+
+	t := tsm.New(2, analysisHop, *synthesisHop, *frameSize, *frameSize)
 	stretchedStream := streamer.New(&t, stream)
 
-	if len(os.Args) > 2 {
-		outputFilename := os.Args[2]
-		outputFile, err := os.Create(outputFilename)
+	if *outputFilename != "" {
+		outputFile, err := os.Create(*outputFilename)
 		if err != nil {
-			fmt.Printf("error: unable to open file \"%s\"\n", outputFilename)
+			fmt.Printf("error: unable to open file \"%s\"\n", *outputFilename)
 			fmt.Println(err)
 			os.Exit(1)
 		}
