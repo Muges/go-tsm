@@ -22,6 +22,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/Muges/tsm"
 	"github.com/Muges/tsm/streamer"
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/speaker"
@@ -32,37 +33,54 @@ import (
 
 func main() {
 	// Read command-line arguments
-	if len(os.Args) != 2 {
-		fmt.Println("usage: tsmplay filename.wav")
+	if len(os.Args) < 2 || len(os.Args) > 3 {
+		fmt.Println("usage: tsmplay filename.wav [output.wav]")
 		os.Exit(1)
 	}
-	filename := os.Args[1]
+	inputFilename := os.Args[1]
 
 	// Open and decode wav file
-	file, err := os.Open(filename)
+	inputFile, err := os.Open(inputFilename)
 	if err != nil {
-		fmt.Printf("error: unable to open file \"%s\"\n", filename)
+		fmt.Printf("error: unable to open file \"%s\"\n", inputFilename)
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	stream, format, err := wav.Decode(file)
+	defer inputFile.Close()
+
+	stream, format, err := wav.Decode(inputFile)
 	if err != nil {
-		fmt.Printf("error: \"%s\" is not a valid wav file\n", filename)
+		fmt.Printf("error: \"%s\" is not a valid wav file\n", inputFilename)
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+	t := tsm.New(2, 128, 128, 256, 256)
+	stretchedStream := streamer.New(&t, stream)
 
-	// Create a channel that will be closed at the end of playback
-	done := make(chan struct{})
+	if len(os.Args) > 2 {
+		outputFilename := os.Args[2]
+		outputFile, err := os.Create(outputFilename)
+		if err != nil {
+			fmt.Printf("error: unable to open file \"%s\"\n", outputFilename)
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		defer outputFile.Close()
 
-	stretched_stream := streamer.Streamer{Streamer: stream}
+		wav.Encode(outputFile, stretchedStream, format)
+	} else {
+		speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+		speaker.UnderrunCallback(func() { fmt.Println("underrun") })
 
-	speaker.Play(beep.Seq(stretched_stream, beep.Callback(func() {
-		close(done)
-	})))
+		// Create a channel that will be closed at the end of playback
+		done := make(chan struct{})
 
-	// Wait for the channel to be closed before quitting
-	<-done
+		speaker.Play(beep.Seq(&stretchedStream, beep.Callback(func() {
+			close(done)
+		})))
+
+		// Wait for the channel to be closed before quitting
+		<-done
+	}
 }

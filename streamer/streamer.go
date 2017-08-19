@@ -22,18 +22,58 @@
 // to be used with the beep library (https://github.com/faiface/beep)
 package streamer
 
-import "github.com/faiface/beep"
+import (
+	"github.com/Muges/tsm"
+	"github.com/Muges/tsm/multichannel"
+	"github.com/faiface/beep"
+	"io"
+)
 
-type Streamer struct {
-	Streamer beep.Streamer
+// A TSMStreamer is a beep.Streamer that changes the speed of a wrapped
+// Streamer without changing its pitch.
+type TSMStreamer struct {
+	t             *tsm.TSM
+	inputStreamer beep.Streamer
+	buffer        [][2]float64
 }
 
-func (s Streamer) Stream(samples [][2]float64) (n int, ok bool) {
-	n, ok = s.Streamer.Stream(samples)
-	return n, ok
+// New creates a new TSMSTreamer, which changes the speed of the inputStreamer
+// using the TSM procedure t.
+func New(t *tsm.TSM, inputStreamer beep.Streamer) TSMStreamer {
+	return TSMStreamer{
+		t:             t,
+		inputStreamer: inputStreamer,
+		buffer:        make([][2]float64, t.InputBufferSize()),
+	}
+}
+
+// Stream copies at most len(samples) next audio samples to the samples slice.
+func (s TSMStreamer) Stream(samples [][2]float64) (n int, ok bool) {
+	length := 0
+
+	for length < len(samples) {
+		// Read samples from input stream and transfer them to TSM
+		nmax := s.t.RemainingInputSpace()
+		n, ok := s.inputStreamer.Stream(s.buffer[:nmax])
+		s.t.Put(multichannel.StereoBuffer(s.buffer[:n]))
+
+		l, err := s.t.Receive(multichannel.StereoBuffer(samples[length:]))
+		length += l
+
+		if err == io.EOF && !ok {
+			l, err := s.t.Flush(multichannel.StereoBuffer(samples[length:]))
+			length += l
+
+			if err == io.EOF {
+				return length, false
+			}
+		}
+	}
+
+	return length, true
 }
 
 // Err propagates the wrapped Streamer's errors.
-func (s Streamer) Err() error {
-	return s.Streamer.Err()
+func (s TSMStreamer) Err() error {
+	return s.inputStreamer.Err()
 }
