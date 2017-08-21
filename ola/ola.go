@@ -58,7 +58,7 @@ func New(channels int, analysisHop int, synthesisHop int, frameSize int,
 // zero, in which case they will be replaced by default values.
 func NewWithSpeed(channels int, speed float64, synthesisHop int, frameSize int, bufferSize int) (*tsm.TSM, error) {
 	if speed == 0 {
-		speed = 100
+		speed = 1
 	}
 	if frameSize == 0 {
 		frameSize = 256
