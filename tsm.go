@@ -178,36 +178,7 @@ func (t *TSM) Receive(buffer multichannel.Buffer) (int, error) {
 	length := t.outBuffer.Read(buffer, 0)
 
 	for length < buffer.Len() && t.inBuffer.Len() >= t.frameSize && t.inBuffer.Len() >= t.analysisHop {
-		// Generate analysis frame, and discard the input samples that won't be
-		// needed anymore
-		t.inBuffer.Peek(t.analysisFrame, 0)
-		t.inBuffer.Remove(t.analysisHop)
-
-		if t.analysisWindow != nil {
-			t.analysisFrame.ApplyWindow(t.analysisWindow)
-		}
-
-		// Convert the analysis frame into a synthesis frame
-		synthesisFrame := t.converter.Convert(t.analysisFrame)
-
-		if t.synthesisWindow != nil {
-			synthesisFrame.ApplyWindow(t.synthesisWindow)
-		}
-
-		// Overlap and add the synthesis frame in the output buffer
-		t.outBuffer.Add(synthesisFrame)
-
-		// The overlap and add step changes the volume of the signal. The
-		// normalizeBuffer is used to keep track of "how much of the input
-		// signal was added" to each part of the output buffer, allowing to
-		// normalize it.
-		t.normalizeBuffer.Add(t.normalizeWindow)
-
-		// Normalize the samples that are ready to be written to the output
-		// (the first synthesisHop ones)
-		t.outBuffer.Divide(t.normalizeBuffer, t.synthesisHop)
-		t.normalizeBuffer.Remove(t.synthesisHop)
-		t.outBuffer.SetReadable(t.synthesisHop)
+		t.processFrame()
 
 		n := t.outBuffer.Read(buffer, length)
 		length += n
@@ -220,6 +191,40 @@ func (t *TSM) Receive(buffer multichannel.Buffer) (int, error) {
 	}
 
 	return length, nil
+}
+
+// process reads an analysis frame from the input buffer, process it, and writes the result to the output buffer.
+func (t *TSM) processFrame() {
+	// Generate analysis frame, and discard the input samples that won't be
+	// needed anymore
+	t.inBuffer.Peek(t.analysisFrame, 0)
+	t.inBuffer.Remove(t.analysisHop)
+
+	if t.analysisWindow != nil {
+		t.analysisFrame.ApplyWindow(t.analysisWindow)
+	}
+
+	// Convert the analysis frame into a synthesis frame
+	synthesisFrame := t.converter.Convert(t.analysisFrame)
+
+	if t.synthesisWindow != nil {
+		synthesisFrame.ApplyWindow(t.synthesisWindow)
+	}
+
+	// Overlap and add the synthesis frame in the output buffer
+	t.outBuffer.Add(synthesisFrame)
+
+	// The overlap and add step changes the volume of the signal. The
+	// normalizeBuffer is used to keep track of "how much of the input
+	// signal was added" to each part of the output buffer, allowing to
+	// normalize it.
+	t.normalizeBuffer.Add(t.normalizeWindow)
+
+	// Normalize the samples that are ready to be written to the output
+	// (the first synthesisHop ones)
+	t.outBuffer.Divide(t.normalizeBuffer, t.synthesisHop)
+	t.normalizeBuffer.Remove(t.synthesisHop)
+	t.outBuffer.SetReadable(t.synthesisHop)
 }
 
 // RemainingInputSpace returns the amount of space available in the input
