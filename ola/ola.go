@@ -41,22 +41,19 @@ func (o olaConverter) Convert(analysisFrame multichannel.TSMBuffer) multichannel
 
 // New returns a TSM implementing the OLA procedure.
 //
-// channels is the number of channels of the signal that the TSM will process,
-// bufferSize is the size of the input buffer, and should be larger than
-// frameSize. Read the documentation of the TSM type above for an explanation
-// of the other arguments.
-func New(channels int, analysisHop int, synthesisHop int, frameSize int,
-	bufferSize int) (*tsm.TSM, error) {
-	return tsm.New(channels, analysisHop, synthesisHop, frameSize, bufferSize,
-		nil, window.Hanning(frameSize), olaConverter{})
+// channels is the number of channels of the signal that the TSM will process.
+// Read the documentation of the TSM type above for an explanation of the other
+// arguments.
+func New(channels int, analysisHop int, synthesisHop int, frameSize int) (*tsm.TSM, error) {
+	return tsm.New(channels, analysisHop, synthesisHop, frameSize, nil, window.Hanning(frameSize), olaConverter{})
 }
 
 // NewWithSpeed returns a TSM implementing the OLA procedure, modifying the
 // sped of the input signal by the ratio speed.
 //
-// The arguments speed, synthesisHop, frameSize and bufferSize may be equal to
-// zero, in which case they will be replaced by default values.
-func NewWithSpeed(channels int, speed float64, synthesisHop int, frameSize int, bufferSize int) (*tsm.TSM, error) {
+// The arguments speed, synthesisHop, frameSize may be equal to zero, in which
+// case they will be replaced by default values.
+func NewWithSpeed(channels int, speed float64, synthesisHop int, frameSize int) (*tsm.TSM, error) {
 	if speed == 0 {
 		speed = 1
 	}
@@ -69,15 +66,11 @@ func NewWithSpeed(channels int, speed float64, synthesisHop int, frameSize int, 
 
 	analysisHop := int(float64(synthesisHop) * speed)
 
-	if bufferSize == 0 {
-		bufferSize = frameSize + analysisHop
-	}
-
-	return New(channels, analysisHop, synthesisHop, frameSize, bufferSize)
+	return New(channels, analysisHop, synthesisHop, frameSize)
 }
 
 // Default returns a TSM implementing the OLA procedure with sane default
 // parameters.
 func Default(channels int, speed float64) (*tsm.TSM, error) {
-	return NewWithSpeed(channels, speed, 0, 0, 0)
+	return NewWithSpeed(channels, speed, 0, 0)
 }

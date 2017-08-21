@@ -65,7 +65,7 @@ func main() {
 	}
 
 	// Set default values
-	t, err := ola.NewWithSpeed(2, *speed, *synthesisHop, *frameSize, *frameSize)
+	t, err := ola.NewWithSpeed(2, *speed, *synthesisHop, *frameSize)
 	if err != nil {
 		fmt.Println("error: unable to create the TSM object")
 		fmt.Println(err)

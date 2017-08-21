@@ -342,7 +342,7 @@ func TestSlice(t *testing.T) {
 				c.in.Slice(c.from, c.to)
 			}, fmt.Sprintf("Buffer.Slice (%d)", i))
 		} else {
-			var out multichannel.TSMBuffer
+			var out multichannel.Buffer
 
 			ok := assert.NotPanics(func() {
 				out = c.in.Slice(c.from, c.to)

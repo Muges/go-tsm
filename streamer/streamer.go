@@ -26,7 +26,6 @@ import (
 	"github.com/Muges/tsm"
 	"github.com/Muges/tsm/multichannel"
 	"github.com/faiface/beep"
-	"io"
 )
 
 // A TSMStreamer is a beep.Streamer that changes the speed of a wrapped
@@ -43,7 +42,6 @@ func New(t *tsm.TSM, inputStreamer beep.Streamer) TSMStreamer {
 	return TSMStreamer{
 		t:             t,
 		inputStreamer: inputStreamer,
-		buffer:        make([][2]float64, t.InputBufferSize()),
 	}
 }
 
@@ -54,20 +52,21 @@ func (s TSMStreamer) Stream(samples [][2]float64) (n int, ok bool) {
 	for length < len(samples) {
 		// Read samples from input stream and transfer them to TSM
 		nmax := s.t.RemainingInputSpace()
-		if nmax > s.buffer.Len() {
-			nmax = s.buffer.Len()
+		if len(s.buffer) < nmax {
+			// This should only happen once
+			s.buffer = make([][2]float64, nmax)
 		}
 		n, ok := s.inputStreamer.Stream(s.buffer[:nmax])
 		s.t.Put(s.buffer[:n])
 
-		l, err := s.t.Receive(multichannel.StereoBuffer(samples[length:]))
+		l := s.t.Receive(multichannel.StereoBuffer(samples[length:]))
 		length += l
 
-		if err == io.EOF && !ok {
-			l, err := s.t.Flush(multichannel.StereoBuffer(samples[length:]))
+		if l == 0 && !ok {
+			l = s.t.Flush(multichannel.StereoBuffer(samples[length:]))
 			length += l
 
-			if err == io.EOF {
+			if l == 0 {
 				return length, false
 			}
 		}

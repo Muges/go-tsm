@@ -20,8 +20,6 @@
 
 package multichannel
 
-import "errors"
-
 // A CBuffer is a fixed-size circular buffer used to store multi-channel audio
 // data.
 //
@@ -128,24 +126,23 @@ func (c *CBuffer) Len() int {
 }
 
 // Peek reads as many samples from the CBuffer as possible (min(c.Len(),
-// buffer.Len())) without removing them from the CBuffer, and returns the
-// number of samples that were read. The samples are written to the buffer,
-// starting at offset (i.e. to "buffer[offset:]").
+// buffer.Len())) without removing them from the CBuffer, writes them to the
+// buffer, and returns the number of samples that were read.
 //
 // It panics if the two buffer do not have the same number of channels.
-func (c *CBuffer) Peek(samples Buffer, offset int) int {
+func (c *CBuffer) Peek(samples Buffer) int {
 	if len(c.data) != samples.Channels() {
 		panic("the two buffers should have the same number of channels")
 	}
 
-	n := samples.Len() - offset
+	n := samples.Len()
 	if c.length < n {
 		n = c.length
 	}
 
 	for k := range c.data {
 		for i := 0; i < n; i++ {
-			samples.SetSample(k, offset+i, c.data[k][(c.readPointer+i)%c.size])
+			samples.SetSample(k, i, c.data[k][(c.readPointer+i)%c.size])
 		}
 
 		// TODO : optimize for Buffer
@@ -159,13 +156,12 @@ func (c *CBuffer) Peek(samples Buffer, offset int) int {
 }
 
 // Read reads as many samples from the CBuffer as possible (min(c.Len(),
-// buffer.Len())), removes them from the CBuffer, and returns the number of
-// samples that were read. The samples are written to the buffer, starting at
-// offset (i.e. to "buffer[offset:]").
+// buffer.Len()), removes them from the CBuffer, writes them to the buffer, and
+// returns the number of samples that were read.
 //
 // It panics if the two buffer do not have the same number of channels.
-func (c *CBuffer) Read(buffer Buffer, offset int) int {
-	n := c.Peek(buffer, offset)
+func (c *CBuffer) Read(buffer Buffer) int {
+	n := c.Peek(buffer)
 	c.Remove(n)
 	return n
 }
@@ -180,7 +176,8 @@ func (c *CBuffer) RemainingSpace() int {
 // again, and leaving more space for new samples to be written.
 func (c *CBuffer) Remove(n int) {
 	if n > c.length {
-		panic("not enough data to remove in the cbuffer")
+		// Remove everything
+		n = c.length
 	}
 
 	for k := range c.data {
@@ -203,26 +200,23 @@ func (c *CBuffer) SetReadable(n int) {
 	c.length += n
 }
 
-// Write writes all the data from the buffer to the CBuffer.
-//
-// The RemainingSpace method should be used before calling Write to ensure that
-// there is enough space to write the data. If there is not, Write will return
-// an error.
+// Write writes all the data from the buffer to the CBuffer, and returns the
+// number of samples that were written.
 //
 // It panics if the CBuffer and the buffer do not have the same number of
 // channels.
-func (c *CBuffer) Write(buffer Buffer) error {
+func (c *CBuffer) Write(buffer Buffer) int {
 	if len(c.data) != buffer.Channels() {
 		panic("the two buffers should have the same number of channels")
 	}
 
-	bufferLength := buffer.Len()
-	if c.RemainingSpace() < bufferLength {
-		return errors.New("not enough space remaining in the circular buffer")
+	n := buffer.Len()
+	if c.RemainingSpace() < n {
+		n = c.RemainingSpace()
 	}
 
 	for k := range c.data {
-		for i := 0; i < bufferLength; i++ {
+		for i := 0; i < n; i++ {
 			c.data[k][(c.readPointer+c.length+i)%c.size] = buffer.Sample(k, i)
 		}
 
@@ -232,7 +226,7 @@ func (c *CBuffer) Write(buffer Buffer) error {
 		//	copy(buffer[k][c.size-c.offset:], c.data[k][:c.offset])
 		//}
 	}
-	c.length += bufferLength
+	c.length += n
 
-	return nil
+	return n
 }

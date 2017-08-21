@@ -96,7 +96,7 @@ func (b TSMBuffer) SetSample(channel int, index int, value float64) {
 // Slice returns a TSMBuffer containing only the audio samples between from
 // (included) and to (excluded) for each channel. It is the equivalent of
 // buffer[from:to], if buffer is a mono-channel buffer represented by a slice.
-func (b TSMBuffer) Slice(from int, to int) TSMBuffer {
+func (b TSMBuffer) Slice(from int, to int) Buffer {
 	slice := make(TSMBuffer, len(b))
 
 	for k := range b {

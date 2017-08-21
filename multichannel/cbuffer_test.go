@@ -35,7 +35,7 @@ func TestEmptyCBuffer(t *testing.T) {
 	assert.Equal(0, buffer.Len(), "Used space in a new CBuffer")
 
 	samples := multichannel.NewTSMBuffer(2, 3)
-	n := buffer.Peek(samples, 0)
+	n := buffer.Peek(samples)
 	assert.Equal(0, n, "Size of read on a new CBuffer")
 	assert.Equal(multichannel.TSMBuffer{{0, 0, 0}, {0, 0, 0}}, samples, "Peek on a new CBuffer")
 }
@@ -50,7 +50,7 @@ func TestFull(t *testing.T) {
 	assert.Equal(5, buffer.Len(), "Used space in a full CBuffer (1)")
 
 	samples := multichannel.NewTSMBuffer(2, 1)
-	n := buffer.Peek(samples, 0)
+	n := buffer.Peek(samples)
 	buffer.Remove(n)
 
 	buffer.Write(multichannel.TSMBuffer{{0}, {0}})
@@ -78,7 +78,7 @@ func TestAddSetReadableDivide(t *testing.T) {
 	assert.Equal(0, buffer.Len(), "Used space in a new CBuffer after Add")
 
 	samples := multichannel.NewTSMBuffer(2, 3)
-	n := buffer.Peek(samples, 0)
+	n := buffer.Peek(samples)
 	assert.Equal(0, n, "Size of read on a new CBuffer after Add")
 	assert.Equal(multichannel.TSMBuffer{{0, 0, 0}, {0, 0, 0}}, samples, "Peek on a new CBuffer after Add")
 
@@ -90,7 +90,7 @@ func TestAddSetReadableDivide(t *testing.T) {
 		buffer.Add(multichannel.TSMBuffer{{1, 2, 3, 4, 5, 6, 7, 8}, {1, 2, 3, 4, 5, 6, 7, 8}})
 	}, "Panic on Add")
 
-	n = buffer.Peek(samples, 0)
+	n = buffer.Peek(samples)
 	assert.Equal(3, n, "Size of read on a new CBuffer after Add and SetReadable")
 	assert.Equal(multichannel.TSMBuffer{{1, 2, 3}, {4, 5, 6}}, samples, "Peek on a new CBuffer after Add and SetReadable")
 }
@@ -99,14 +99,13 @@ func TestWrite(t *testing.T) {
 	assert := assert.New(t)
 
 	buffer := multichannel.NewCBuffer(2, 5)
-	err := buffer.Write(multichannel.TSMBuffer{{1, 2, 3}, {4, 5, 6}})
+	buffer.Write(multichannel.TSMBuffer{{1, 2, 3}, {4, 5, 6}})
 
-	assert.NoError(err, "No error after Write (1)")
 	assert.Equal(2, buffer.RemainingSpace(), "Remaining space in a new CBuffer after Write")
 	assert.Equal(3, buffer.Len(), "Used space in a new CBuffer after Write")
 
 	samples := multichannel.NewTSMBuffer(2, 3)
-	n := buffer.Peek(samples, 0)
+	n := buffer.Peek(samples)
 	assert.Equal(3, n, "Size of read on a new CBuffer after Write")
 	assert.Equal(multichannel.TSMBuffer{{1, 2, 3}, {4, 5, 6}}, samples, "Peek on a new CBuffer after Write")
 
@@ -114,12 +113,11 @@ func TestWrite(t *testing.T) {
 	assert.Equal(5, buffer.RemainingSpace(), "Remaining space in a new CBuffer after Write and Read")
 	assert.Equal(0, buffer.Len(), "Used space in a new CBuffer after Write and Peek")
 
-	err = buffer.Write(multichannel.TSMBuffer{{1, 2, 3, 4}, {5, 6, 7, 8}})
+	buffer.Write(multichannel.TSMBuffer{{1, 2, 3, 4}, {5, 6, 7, 8}})
 
-	assert.NoError(err, "No error after Write (2)")
 	assert.Equal(1, buffer.RemainingSpace(), "Remaining space in a new CBuffer after Write and Peek and Write")
 	assert.Equal(4, buffer.Len(), "Used space in a new CBuffer after Write and Peek and Write")
 
-	err = buffer.Write(multichannel.TSMBuffer{{1, 2}, {3, 4}})
-	assert.Error(err, "Error after Write")
+	n = buffer.Write(multichannel.TSMBuffer{{1, 2}, {3, 4}})
+	assert.Equal(1, n, "Incomplete Write")
 }

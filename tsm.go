@@ -21,7 +21,6 @@
 // TODO : the first frames may need to be handled differently to avoid fade-in
 // TODO : the last frames may need to be handled differently to avoid fade-out
 // TODO : should functions return errors?
-// TODO : process in put, not in receive?
 
 // Package tsm implements several real-time time-scale modification methods,
 // i.e. algorithms that change the playback speed of an audio signal without
@@ -32,7 +31,6 @@ import (
 	"github.com/Muges/tsm/multichannel"
 	"github.com/Muges/tsm/window"
 	"github.com/pkg/errors"
-	"io"
 )
 
 // A Converter is an object implementing the conversion of an analysis frame
@@ -82,11 +80,14 @@ type TSM struct {
 	analysisHop     int
 	synthesisHop    int
 	frameSize       int
-	bufferSize      int
 	analysisWindow  []float64
 	synthesisWindow []float64
 	converter       Converter
 
+	// When analysisHop is larger than frameSize, some samples from the input
+	// need to be skipped. skipSamples tracks how many samples should be
+	// skipped before reading the analysis frame.
+	skipSamples     int
 	normalizeWindow []float64
 
 	inBuffer        multichannel.CBuffer
@@ -97,20 +98,10 @@ type TSM struct {
 
 // New creates a new TSM object.
 //
-// channels is the number of channels of the signal that the TSM will process,
-// bufferSize is the size of the input buffer, and should be larger than
-// frameSize. Read the documentation of the TSM type above for an explanation
-// of the other arguments.
-func New(channels int, analysisHop int, synthesisHop int, frameSize int,
-	bufferSize int, analysisWindow []float64, synthesisWindow []float64,
-	converter Converter) (*TSM, error) {
-
-	if frameSize > bufferSize {
-		return nil, errors.New("bufferSize should be larger than frameSize")
-	}
-	if analysisHop > bufferSize {
-		return nil, errors.New("bufferSize should be larger than analysisHop")
-	}
+// channels is the number of channels of the signal that the TSM will process.
+// Read the documentation of the TSM type above for an explanation of the other
+// arguments.
+func New(channels int, analysisHop int, synthesisHop int, frameSize int, analysisWindow []float64, synthesisWindow []float64, converter Converter) (*TSM, error) {
 
 	normalizeWindow, err := window.Product(analysisWindow, synthesisWindow)
 	if err != nil {
@@ -121,83 +112,76 @@ func New(channels int, analysisHop int, synthesisHop int, frameSize int,
 		analysisHop:     analysisHop,
 		synthesisHop:    synthesisHop,
 		frameSize:       frameSize,
-		bufferSize:      bufferSize,
 		analysisWindow:  analysisWindow,
 		synthesisWindow: synthesisWindow,
 		converter:       converter,
 
 		normalizeWindow: normalizeWindow,
 
-		inBuffer:        multichannel.NewCBuffer(channels, bufferSize),
+		inBuffer:        multichannel.NewCBuffer(channels, frameSize),
 		analysisFrame:   multichannel.NewTSMBuffer(channels, frameSize),
-		outBuffer:       multichannel.NewCBuffer(channels, frameSize+synthesisHop),
-		normalizeBuffer: multichannel.NewNormalizeBuffer(frameSize + synthesisHop),
+		outBuffer:       multichannel.NewCBuffer(channels, frameSize),
+		normalizeBuffer: multichannel.NewNormalizeBuffer(frameSize),
 	}, nil
 }
 
 // Flush writes the last output samples to the buffer, assuming that no samples
-// will be added to the input.
+// will be added to the input, and returns the number of samples that were
+// written.
 //
-// It returns an integer and an error. The error will be equal to io.EOF when
-// the input buffer is empty. The integer will always be equal to the length of
-// the buffer, except when the input buffer is empty.
-func (t *TSM) Flush(buffer multichannel.Buffer) (int, error) {
-	length := t.outBuffer.Read(buffer, 0)
+// The return value will always be equal to buffer.Len(), except when there is
+// no more values to be written.
+func (t *TSM) Flush(buffer multichannel.Buffer) int {
+	length := t.outBuffer.Read(buffer)
 
-	if t.outBuffer.Len() == 0 {
-		return length, io.EOF
-	}
-	return length, nil
+	return length
 }
 
-// InputBufferSize returns the size of the input buffer.
-func (t *TSM) InputBufferSize() int {
-	return t.bufferSize
-}
-
-// Put stores samples in a buffer for them to be processed later. Put will
-// return an error if the length of buffer is larger than the result of
-// RemainingInputSpace().
-func (t *TSM) Put(buffer multichannel.Buffer) error {
-	err := t.inBuffer.Write(buffer)
-	if err != nil {
-		return errors.Wrap(err, "unable to copy samples to input buffer")
+// Put reads samples from buffer and processes them. It returns the number of samples that were read.
+//
+// Ideally, the length of buffer should be equal to RemainingInputSpace(), but
+// it is not required. If it is lower, the samples will be buffered but will
+// not be processed. If it is larger, some samples from buffer will not be
+// read.
+func (t *TSM) Put(buffer multichannel.Buffer) int {
+	n := 0
+	if t.skipSamples >= buffer.Len() {
+		// All the samples in the buffer have to be skipped
+		n = buffer.Len()
+	} else {
+		n := t.skipSamples
+		n += t.inBuffer.Write(buffer.Slice(t.skipSamples, buffer.Len()))
 	}
-	return nil
+	t.skipSamples -= n
+
+	if t.inBuffer.Len() >= t.frameSize && t.outBuffer.RemainingSpace() >= t.frameSize {
+		// The input buffer has enough data to process, and there is enough
+		// space in the output buffer to put the result.
+		t.processFrame()
+		t.skipSamples = t.analysisHop - t.frameSize
+		if t.skipSamples < 0 {
+			t.skipSamples = 0
+		}
+	}
+
+	return n
 }
 
 // Receive writes the result of the Time-Scale Modification procedure to
 // buffer, and returns the number of samples that were written per channels.
 //
-// It returns and integer and an error. The error will be equal to io.EOF when
-// the input buffer is empty, in which case you should either use Put to add
-// new samples, or use Flush if there are no more samples to add to the input.
-// The integer will always be equal to the length of the buffer, except when
-// the input buffer is empty.
-func (t *TSM) Receive(buffer multichannel.Buffer) (int, error) {
-	length := t.outBuffer.Read(buffer, 0)
-
-	for length < buffer.Len() && t.inBuffer.Len() >= t.frameSize && t.inBuffer.Len() >= t.analysisHop {
-		t.processFrame()
-
-		n := t.outBuffer.Read(buffer, length)
-		length += n
-	}
-
-	if t.inBuffer.Len() < t.frameSize || t.inBuffer.Len() < t.analysisHop {
-		// There is not enough samples in the input buffer for them to be
-		// processed
-		return length, io.EOF
-	}
-
-	return length, nil
+// The return value will always be equal to buffer.Len(), except when there is
+// no more values to be written. In this case, you should either call Put to
+// provide more input samples, or Flush if there is no input samples remaining.
+func (t *TSM) Receive(buffer multichannel.Buffer) int {
+	return t.outBuffer.Read(buffer)
 }
 
 // process reads an analysis frame from the input buffer, process it, and writes the result to the output buffer.
 func (t *TSM) processFrame() {
 	// Generate analysis frame, and discard the input samples that won't be
 	// needed anymore
-	t.inBuffer.Peek(t.analysisFrame, 0)
+	t.inBuffer.Peek(t.analysisFrame)
 	t.inBuffer.Remove(t.analysisHop)
 
 	if t.analysisWindow != nil {
@@ -231,5 +215,5 @@ func (t *TSM) processFrame() {
 // buffer, i.e. the number of samples that can be added to each channel of the
 // buffer.
 func (t *TSM) RemainingInputSpace() int {
-	return t.inBuffer.RemainingSpace()
+	return t.skipSamples + t.inBuffer.RemainingSpace()
 }

@@ -35,6 +35,12 @@ type Buffer interface {
 	// SetSample sets the index-th sample of the channel-c channel of the
 	// buffer to value.
 	SetSample(channel int, index int, value float64)
+
+	// Slice returns a Buffer containing only the audio samples between from
+	// (included) and to (excluded) for each channel. It is the equivalent of
+	// buffer[from:to], if buffer is a mono-channel buffer represented by a
+	// slice.
+	Slice(from int, to int) Buffer
 }
 
 // A StereoBuffer is a representation of a stereo audio buffer which implements
@@ -65,4 +71,11 @@ func (s StereoBuffer) Sample(channel int, index int) float64 {
 // value.
 func (s StereoBuffer) SetSample(channel int, index int, value float64) {
 	s[index][channel] = value
+}
+
+// Slice returns a Buffer containing only the audio samples between from
+// (included) and to (excluded) for each channel. It is the equivalent of
+// buffer[from:to], if buffer is a mono-channel buffer represented by a slice.
+func (s StereoBuffer) Slice(from int, to int) Buffer {
+	return s[from:to]
 }
