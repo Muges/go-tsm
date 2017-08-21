@@ -34,7 +34,7 @@ import (
 type TSMStreamer struct {
 	t             *tsm.TSM
 	inputStreamer beep.Streamer
-	buffer        [][2]float64
+	buffer        multichannel.StereoBuffer
 }
 
 // New creates a new TSMSTreamer, which changes the speed of the inputStreamer
@@ -54,8 +54,11 @@ func (s TSMStreamer) Stream(samples [][2]float64) (n int, ok bool) {
 	for length < len(samples) {
 		// Read samples from input stream and transfer them to TSM
 		nmax := s.t.RemainingInputSpace()
+		if nmax > s.buffer.Len() {
+			nmax = s.buffer.Len()
+		}
 		n, ok := s.inputStreamer.Stream(s.buffer[:nmax])
-		s.t.Put(multichannel.StereoBuffer(s.buffer[:n]))
+		s.t.Put(s.buffer[:n])
 
 		l, err := s.t.Receive(multichannel.StereoBuffer(samples[length:]))
 		length += l

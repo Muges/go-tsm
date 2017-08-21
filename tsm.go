@@ -108,6 +108,9 @@ func New(channels int, analysisHop int, synthesisHop int, frameSize int,
 	if frameSize > bufferSize {
 		return nil, errors.New("bufferSize should be larger than frameSize")
 	}
+	if analysisHop > bufferSize {
+		return nil, errors.New("bufferSize should be larger than analysisHop")
+	}
 
 	normalizeWindow, err := window.Product(analysisWindow, synthesisWindow)
 	if err != nil {
@@ -174,7 +177,7 @@ func (t *TSM) Put(buffer multichannel.Buffer) error {
 func (t *TSM) Receive(buffer multichannel.Buffer) (int, error) {
 	length := t.outBuffer.Read(buffer, 0)
 
-	for length < buffer.Len() && t.inBuffer.Len() >= t.frameSize {
+	for length < buffer.Len() && t.inBuffer.Len() >= t.frameSize && t.inBuffer.Len() >= t.analysisHop {
 		// Generate analysis frame, and discard the input samples that won't be
 		// needed anymore
 		t.inBuffer.Peek(t.analysisFrame, 0)
@@ -210,7 +213,7 @@ func (t *TSM) Receive(buffer multichannel.Buffer) (int, error) {
 		length += n
 	}
 
-	if t.inBuffer.Len() < t.frameSize {
+	if t.inBuffer.Len() < t.frameSize || t.inBuffer.Len() < t.analysisHop {
 		// There is not enough samples in the input buffer for them to be
 		// processed
 		return length, io.EOF

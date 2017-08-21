@@ -66,11 +66,12 @@ func NewWithSpeed(channels int, speed float64, synthesisHop int, frameSize int, 
 	if synthesisHop == 0 {
 		synthesisHop = frameSize / 2
 	}
-	if bufferSize == 0 {
-		bufferSize = frameSize
-	}
 
 	analysisHop := int(float64(synthesisHop) * speed)
+
+	if bufferSize == 0 {
+		bufferSize = frameSize + analysisHop
+	}
 
 	return New(channels, analysisHop, synthesisHop, frameSize, bufferSize)
 }

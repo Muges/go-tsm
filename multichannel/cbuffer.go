@@ -138,7 +138,7 @@ func (c *CBuffer) Peek(samples Buffer, offset int) int {
 		panic("the two buffers should have the same number of channels")
 	}
 
-	n := samples.Len()
+	n := samples.Len() - offset
 	if c.length < n {
 		n = c.length
 	}
@@ -179,6 +179,10 @@ func (c *CBuffer) RemainingSpace() int {
 // Remove removes the first n samples of the buffer, preventing them to be read
 // again, and leaving more space for new samples to be written.
 func (c *CBuffer) Remove(n int) {
+	if n > c.length {
+		panic("not enough data to remove in the cbuffer")
+	}
+
 	for k := range c.data {
 		for i := 0; i < n; i++ {
 			c.data[k][(c.readPointer+i)%c.size] = 0
