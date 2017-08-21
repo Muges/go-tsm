@@ -22,7 +22,10 @@
 // Package window provides window functions for digital signal processing.
 package window
 
-import "math"
+import (
+	"errors"
+	"math"
+)
 
 // Hanning returns a periodic Hannning window of size n.
 func Hanning(n int) []float64 {
@@ -34,4 +37,27 @@ func Hanning(n int) []float64 {
 	}
 
 	return window
+}
+
+// Product returns the product of two windows.
+//
+// If one of the windows is equal to nil, the other will be returned. If both
+// are equal to nil, nil will be returned.
+func Product(window1 []float64, window2 []float64) ([]float64, error) {
+	if window1 == nil {
+		return window2, nil
+	}
+	if window2 == nil {
+		return window1, nil
+	}
+	if len(window1) != len(window2) {
+		return nil, errors.New("the two windows should have the same size")
+	}
+
+	product := make([]float64, len(window1))
+	for i, v := range window1 {
+		product[i] = v * window2[i]
+	}
+
+	return product, nil
 }

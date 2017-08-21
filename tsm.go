@@ -35,6 +35,12 @@ import (
 	"io"
 )
 
+// A Converter is an object implementing the conversion of an analysis frame
+// into a synthesis frame.
+type Converter interface {
+	Convert(analysisFrame multichannel.TSMBuffer) (synthesisFrame multichannel.TSMBuffer)
+}
+
 // A TSM is an object implementing a Time-Scale Modification procedure.
 //
 // The basic principle of the TSM is to first decompose the input signal into
@@ -59,11 +65,15 @@ import (
 // (for example, if the synthesisHop is twice the analysisHop, the output
 // signal will be half as fast as the input signal).
 //
-// However this simple method introduces artifacts to the signal. This can be
-// partially corrected by applying a window function (the analysisWindow) to
-// the frame in order to smooth the signal, by making modifications on the
-// frames to reduce the artifacts, and by then reapplying a window function
-// (the synthesisWindow) to the resulting frame.
+// However this simple method introduces artifacts to the signal. These
+// artifacts can be reduced by modifying the analysis frames by various
+// methods. The modified frames are called the synthesis frames. The conversion
+// of the analysis frames into the synthesis frames is handled by the
+// converter.
+//
+// To further reduce the artifacts, window functions (the analysisWindow and
+// the synthesisWindow) can be applied to the analysis frames and the synthesis
+// frames in order to smooth the signal.
 //
 // For more details on Time-Scale Modification procedures, I recommend reading
 // "A Review of Time-Scale Modification of music Signals" by Jonathan Driedger
@@ -75,6 +85,8 @@ type TSM struct {
 	bufferSize      int
 	analysisWindow  []float64
 	synthesisWindow []float64
+	converter       Converter
+
 	normalizeWindow []float64
 
 	inBuffer        multichannel.CBuffer
@@ -89,21 +101,35 @@ type TSM struct {
 // bufferSize is the size of the input buffer, and should be larger than
 // frameSize. Read the documentation of the TSM type above for an explanation
 // of the other arguments.
-func New(channels int, analysisHop int, synthesisHop int, frameSize int, bufferSize int) TSM {
-	return TSM{
+func New(channels int, analysisHop int, synthesisHop int, frameSize int,
+	bufferSize int, analysisWindow []float64, synthesisWindow []float64,
+	converter Converter) (*TSM, error) {
+
+	if frameSize > bufferSize {
+		return nil, errors.New("bufferSize should be larger than frameSize")
+	}
+
+	normalizeWindow, err := window.Product(analysisWindow, synthesisWindow)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to create normalizeWindow")
+	}
+
+	return &TSM{
 		analysisHop:     analysisHop,
 		synthesisHop:    synthesisHop,
 		frameSize:       frameSize,
 		bufferSize:      bufferSize,
-		analysisWindow:  nil,
-		synthesisWindow: window.Hanning(frameSize),
-		normalizeWindow: window.Hanning(frameSize),
+		analysisWindow:  analysisWindow,
+		synthesisWindow: synthesisWindow,
+		converter:       converter,
+
+		normalizeWindow: normalizeWindow,
 
 		inBuffer:        multichannel.NewCBuffer(channels, bufferSize),
 		analysisFrame:   multichannel.NewTSMBuffer(channels, frameSize),
 		outBuffer:       multichannel.NewCBuffer(channels, frameSize+synthesisHop),
 		normalizeBuffer: multichannel.NewNormalizeBuffer(frameSize + synthesisHop),
-	}
+	}, nil
 }
 
 // Flush writes the last output samples to the buffer, assuming that no samples
@@ -159,19 +185,26 @@ func (t *TSM) Receive(buffer multichannel.Buffer) (int, error) {
 		}
 
 		// Convert the analysis frame into a synthesis frame
-		synthesisFrame := t.analysisFrame
+		synthesisFrame := t.converter.Convert(t.analysisFrame)
 
-		synthesisFrame.ApplyWindow(t.synthesisWindow)
+		if t.synthesisWindow != nil {
+			synthesisFrame.ApplyWindow(t.synthesisWindow)
+		}
 
 		// Overlap and add the synthesis frame in the output buffer
 		t.outBuffer.Add(synthesisFrame)
+
+		// The overlap and add step changes the volume of the signal. The
+		// normalizeBuffer is used to keep track of "how much of the input
+		// signal was added" to each part of the output buffer, allowing to
+		// normalize it.
 		t.normalizeBuffer.Add(t.normalizeWindow)
 
 		// Normalize the samples that are ready to be written to the output
 		// (the first synthesisHop ones)
 		t.outBuffer.Divide(t.normalizeBuffer, t.synthesisHop)
-		t.outBuffer.SetReadable(t.synthesisHop)
 		t.normalizeBuffer.Remove(t.synthesisHop)
+		t.outBuffer.SetReadable(t.synthesisHop)
 
 		n := t.outBuffer.Read(buffer, length)
 		length += n

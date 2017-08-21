@@ -22,7 +22,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/Muges/tsm"
+	"github.com/Muges/tsm/ola"
 	"github.com/Muges/tsm/streamer"
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/speaker"
@@ -35,7 +35,7 @@ import (
 var (
 	app = kingpin.New("tsmplay", "Change the speed of a WAV audio file.")
 
-	speed          = app.Flag("speed", "Change the speed by N percents (100 by default).").Short('s').PlaceHolder("N").Int()
+	speed          = app.Flag("speed", "Change the speed by N percents (100 by default).").Short('s').PlaceHolder("N").Float64()
 	frameSize      = app.Flag("frame_size", "Set the frame size to N.").Short('f').PlaceHolder("N").Int()
 	synthesisHop   = app.Flag("synthesis_hop", "Set the synthesis hop to N.").PlaceHolder("N").Int()
 	outputFilename = app.Flag("output", "Save the stretched audio to FILENAME instead of playing it.").Short('o').PlaceHolder("FILENAME").String()
@@ -65,20 +65,13 @@ func main() {
 	}
 
 	// Set default values
-	if *speed == 0 {
-		*speed = 100
+	t, err := ola.NewWithSpeed(2, *speed, *synthesisHop, *frameSize, *frameSize)
+	if err != nil {
+		fmt.Println("error: unable to create the TSM object")
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	if *frameSize == 0 {
-		*frameSize = format.SampleRate.N(10 * time.Millisecond)
-	}
-	if *synthesisHop == 0 {
-		*synthesisHop = *frameSize / 4
-	}
-
-	analysisHop := (*synthesisHop * *speed) / 100
-
-	t := tsm.New(2, analysisHop, *synthesisHop, *frameSize, *frameSize)
-	stretchedStream := streamer.New(&t, stream)
+	stretchedStream := streamer.New(t, stream)
 
 	if *outputFilename != "" {
 		outputFile, err := os.Create(*outputFilename)
