@@ -25,6 +25,9 @@ type Buffer interface {
 	// Channels returns the number of channels of the buffer.
 	Channels() int
 
+	// Len returns the number of samples of each channel of the buffer.
+	Len() int
+
 	// Sample returns the index-th sample of the channel-th channel of the
 	// buffer.
 	Sample(channel int, index int) float64
@@ -32,9 +35,6 @@ type Buffer interface {
 	// SetSample sets the index-th sample of the channel-c channel of the
 	// buffer to value.
 	SetSample(channel int, index int, value float64)
-
-	// Len returns the number of samples of each channel of the buffer.
-	Len() int
 }
 
 // A StereoBuffer is a representation of a stereo audio buffer which implements
@@ -51,6 +51,11 @@ func (s StereoBuffer) Channels() int {
 	return 2
 }
 
+// Len returns the number of samples of each channel of the buffer.
+func (s StereoBuffer) Len() int {
+	return len(s)
+}
+
 // Sample returns the index-th sample of the channel-th channel of the buffer.
 func (s StereoBuffer) Sample(channel int, index int) float64 {
 	return s[index][channel]
@@ -60,9 +65,4 @@ func (s StereoBuffer) Sample(channel int, index int) float64 {
 // value.
 func (s StereoBuffer) SetSample(channel int, index int, value float64) {
 	s[index][channel] = value
-}
-
-// Len returns the number of samples of each channel of the buffer.
-func (s StereoBuffer) Len() int {
-	return len(s)
 }
