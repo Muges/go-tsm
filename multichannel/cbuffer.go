@@ -200,8 +200,8 @@ func (c *CBuffer) SetReadable(n int) {
 	c.length += n
 }
 
-// Write writes all the data from the buffer to the CBuffer, and returns the
-// number of samples that were written.
+// Write writes as many samples as possible from the buffer to the CBuffer, and
+// returns the number of samples that were written.
 //
 // It panics if the CBuffer and the buffer do not have the same number of
 // channels.

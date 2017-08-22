@@ -18,12 +18,12 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-// TODO : the last frames may need to be handled differently to avoid fade-out
-// TODO : should functions return errors?
-
 // Package tsm implements several real-time time-scale modification methods,
 // i.e. algorithms that change the playback speed of an audio signal without
 // changing its pitch.
+//
+// The package tsm itself only provides a TSM object that makes it easy to
+// implement time-scale modification procedures.
 package tsm
 
 import (
@@ -38,52 +38,65 @@ type Converter interface {
 	Convert(analysisFrame multichannel.TSMBuffer) (synthesisFrame multichannel.TSMBuffer)
 }
 
-// A TSM is an object implementing a Time-Scale Modification procedure.
+// A Settings is a struct containing the settings for a TSM object. It is used
+// for the creation of a new TSM
+//
+// Channels is the number of channels of the signal that the TSM will process.
+// The other fields are parameters of the TSM algorithm that are explained
+// below.
 //
 // The basic principle of the TSM is to first decompose the input signal into
 // short overlapping frames, called the analysis frames. The frames have a
-// fixed length frameSize, and are separated by a distance analysisHop, as
+// fixed length FrameLength, and are separated by a distance AnalysisHop, as
 // illustrated below.
 //
-//              <---------frameSize---------><-analysisHop->
+//              <--------FrameLength--------><-AnalysisHop->
 //    Frame 1:  [~~~~~~~~~~~~~~~~~~~~~~~~~~~]
 //    Frame 2:                 [~~~~~~~~~~~~~~~~~~~~~~~~~~~]
 //    Frame 3:                                [~~~~~~~~~~~~~~~~~~~~~~~~~~~]
 //
 // It then relocates the frames on the time axis by changing the distance
-// between them (to synthesisHop), as illustrated below.
+// between them (to SynthesisHop), as illustrated below.
 //
-//              <---------frameSize---------><---synthesisHop--->
+//              <--------FrameLength--------><---SynthesisHop--->
 //    Frame 1:  [~~~~~~~~~~~~~~~~~~~~~~~~~~~]
 //    Frame 2:                      [~~~~~~~~~~~~~~~~~~~~~~~~~~~]
 //    Frame 3:                                          [~~~~~~~~~~~~~~~~~~~~~~~~~~~]
 //
-// This changes the speed of the signal by the ratio analysisHop/synthesisHop
-// (for example, if the synthesisHop is twice the analysisHop, the output
+// This changes the speed of the signal by the ratio AnalysisHop/SynthesisHop
+// (for example, if the SynthesisHop is twice the AnalysisHop, the output
 // signal will be half as fast as the input signal).
 //
 // However this simple method introduces artifacts to the signal. These
 // artifacts can be reduced by modifying the analysis frames by various
 // methods. The modified frames are called the synthesis frames. The conversion
 // of the analysis frames into the synthesis frames is handled by the
-// converter.
+// Converter.
 //
-// To further reduce the artifacts, window functions (the analysisWindow and
-// the synthesisWindow) can be applied to the analysis frames and the synthesis
+// To further reduce the artifacts, window functions (the AnalysisWindow and
+// the SynthesisWindow) can be applied to the analysis frames and the synthesis
 // frames in order to smooth the signal.
 //
 // For more details on Time-Scale Modification procedures, I recommend reading
 // "A Review of Time-Scale Modification of music Signals" by Jonathan Driedger
 // and Meinard Müller (http://www.mdpi.com/2076-3417/6/2/57).
-type TSM struct {
-	analysisHop     int
-	synthesisHop    int
-	frameSize       int
-	analysisWindow  []float64
-	synthesisWindow []float64
-	converter       Converter
+//
+type Settings struct {
+	Channels        int
+	AnalysisHop     int
+	SynthesisHop    int
+	FrameLength     int
+	AnalysisWindow  []float64
+	SynthesisWindow []float64
+	Converter       Converter
+}
 
-	// When analysisHop is larger than frameSize, some samples from the input
+// A TSM is an object implementing a Time-Scale Modification procedure.
+//
+type TSM struct {
+	s Settings
+
+	// When analysisHop is larger than frameLength, some samples from the input
 	// need to be skipped. skipInputSamples tracks how many samples should be
 	// skipped before reading the analysis frame.
 	skipInputSamples  int
@@ -98,29 +111,24 @@ type TSM struct {
 
 // New creates a new TSM object.
 //
-// channels is the number of channels of the signal that the TSM will process.
-// Read the documentation of the TSM type above for an explanation of the other
-// arguments.
-func New(channels int, analysisHop int, synthesisHop int, frameSize int, analysisWindow []float64, synthesisWindow []float64, converter Converter) (*TSM, error) {
-	normalizeWindow, err := window.Product(analysisWindow, synthesisWindow)
+// New should only be used if you want to implement a new TSM procedure. If you
+// just want to use an existing one, you should create the TSM object from one
+// of the subpackages of this package.
+func New(s Settings) (*TSM, error) {
+	normalizeWindow, err := window.Product(s.AnalysisWindow, s.SynthesisWindow)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create normalizeWindow")
 	}
 
 	t := &TSM{
-		analysisHop:     analysisHop,
-		synthesisHop:    synthesisHop,
-		frameSize:       frameSize,
-		analysisWindow:  analysisWindow,
-		synthesisWindow: synthesisWindow,
-		converter:       converter,
+		s: s,
 
 		normalizeWindow: normalizeWindow,
 
-		inBuffer:        multichannel.NewCBuffer(channels, frameSize),
-		analysisFrame:   multichannel.NewTSMBuffer(channels, frameSize),
-		outBuffer:       multichannel.NewCBuffer(channels, frameSize),
-		normalizeBuffer: multichannel.NewNormalizeBuffer(frameSize),
+		inBuffer:        multichannel.NewCBuffer(s.Channels, s.FrameLength),
+		analysisFrame:   multichannel.NewTSMBuffer(s.Channels, s.FrameLength),
+		outBuffer:       multichannel.NewCBuffer(s.Channels, s.FrameLength),
+		normalizeBuffer: multichannel.NewNormalizeBuffer(s.FrameLength),
 	}
 	t.Clear()
 
@@ -132,15 +140,15 @@ func New(channels int, analysisHop int, synthesisHop int, frameSize int, analysi
 // Flush.
 func (t *TSM) Clear() {
 	// Clear the buffers
-	t.inBuffer.Remove(t.frameSize)
-	t.outBuffer.Remove(t.frameSize)
-	t.normalizeBuffer.Remove(t.frameSize)
+	t.inBuffer.Remove(t.s.FrameLength)
+	t.outBuffer.Remove(t.s.FrameLength)
+	t.normalizeBuffer.Remove(t.s.FrameLength)
 
 	// Left pad the input with half a frame of zeros, and ignore that half
 	// frame in the output. This makes the output signal start in the middle of
 	// a frame, which should be the peak of the window function.
-	t.inBuffer.SetReadable(t.frameSize / 2)
-	t.skipOutputSamples = t.frameSize / 2
+	t.inBuffer.SetReadable(t.s.FrameLength / 2)
+	t.skipOutputSamples = t.s.FrameLength / 2
 }
 
 // Flush writes the last output samples to the buffer, assuming that no samples
@@ -150,7 +158,12 @@ func (t *TSM) Clear() {
 // The return value will always be equal to buffer.Len(), except when there is
 // no more values to be written.
 func (t *TSM) Flush(buffer multichannel.Buffer) int {
+	expectedLength := buffer.Len()
 	length := t.outBuffer.Read(buffer)
+
+	if expectedLength < buffer.Len() {
+		t.Clear()
+	}
 
 	return length
 }
@@ -172,7 +185,7 @@ func (t *TSM) Put(buffer multichannel.Buffer) int {
 	}
 	t.skipInputSamples -= n
 
-	if t.inBuffer.Len() >= t.frameSize && t.outBuffer.RemainingSpace() >= t.frameSize {
+	if t.inBuffer.Len() >= t.s.FrameLength && t.outBuffer.RemainingSpace() >= t.s.FrameLength {
 		// The input buffer has enough data to process, and there is enough
 		// space in the output buffer to put the result.
 		t.processFrame()
@@ -185,7 +198,7 @@ func (t *TSM) Put(buffer multichannel.Buffer) int {
 			t.skipOutputSamples = 0
 		}
 
-		t.skipInputSamples = t.analysisHop - t.frameSize
+		t.skipInputSamples = t.s.AnalysisHop - t.s.FrameLength
 		if t.skipInputSamples < 0 {
 			t.skipInputSamples = 0
 		}
@@ -209,17 +222,17 @@ func (t *TSM) processFrame() {
 	// Generate analysis frame, and discard the input samples that won't be
 	// needed anymore
 	t.inBuffer.Peek(t.analysisFrame)
-	t.inBuffer.Remove(t.analysisHop)
+	t.inBuffer.Remove(t.s.AnalysisHop)
 
-	if t.analysisWindow != nil {
-		t.analysisFrame.ApplyWindow(t.analysisWindow)
+	if t.s.AnalysisWindow != nil {
+		t.analysisFrame.ApplyWindow(t.s.AnalysisWindow)
 	}
 
 	// Convert the analysis frame into a synthesis frame
-	synthesisFrame := t.converter.Convert(t.analysisFrame)
+	synthesisFrame := t.s.Converter.Convert(t.analysisFrame)
 
-	if t.synthesisWindow != nil {
-		synthesisFrame.ApplyWindow(t.synthesisWindow)
+	if t.s.SynthesisWindow != nil {
+		synthesisFrame.ApplyWindow(t.s.SynthesisWindow)
 	}
 
 	// Overlap and add the synthesis frame in the output buffer
@@ -233,9 +246,9 @@ func (t *TSM) processFrame() {
 
 	// Normalize the samples that are ready to be written to the output
 	// (the first synthesisHop ones)
-	t.outBuffer.Divide(t.normalizeBuffer, t.synthesisHop)
-	t.normalizeBuffer.Remove(t.synthesisHop)
-	t.outBuffer.SetReadable(t.synthesisHop)
+	t.outBuffer.Divide(t.normalizeBuffer, t.s.SynthesisHop)
+	t.normalizeBuffer.Remove(t.s.SynthesisHop)
+	t.outBuffer.SetReadable(t.s.SynthesisHop)
 }
 
 // RemainingInputSpace returns the amount of space available in the input

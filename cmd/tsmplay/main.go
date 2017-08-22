@@ -36,7 +36,7 @@ var (
 	app = kingpin.New("tsmplay", "Change the speed of a WAV audio file.")
 
 	speed          = app.Flag("speed", "Change the speed by N percents (100 by default).").Short('s').PlaceHolder("N").Float64()
-	frameSize      = app.Flag("frame_size", "Set the frame size to N.").Short('f').PlaceHolder("N").Int()
+	frameLength    = app.Flag("frame_length", "Set the frame length to N.").Short('l').PlaceHolder("N").Int()
 	synthesisHop   = app.Flag("synthesis_hop", "Set the synthesis hop to N.").PlaceHolder("N").Int()
 	outputFilename = app.Flag("output", "Save the stretched audio to FILENAME instead of playing it.").Short('o').PlaceHolder("FILENAME").String()
 
@@ -65,7 +65,7 @@ func main() {
 	}
 
 	// Set default values
-	t, err := ola.NewWithSpeed(2, *speed, *synthesisHop, *frameSize)
+	t, err := ola.NewWithSpeed(2, *speed, *synthesisHop, *frameLength)
 	if err != nil {
 		fmt.Println("error: unable to create the TSM object")
 		fmt.Println(err)

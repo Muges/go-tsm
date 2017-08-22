@@ -44,29 +44,36 @@ func (o olaConverter) Convert(analysisFrame multichannel.TSMBuffer) multichannel
 // channels is the number of channels of the signal that the TSM will process.
 // Read the documentation of the TSM type above for an explanation of the other
 // arguments.
-func New(channels int, analysisHop int, synthesisHop int, frameSize int) (*tsm.TSM, error) {
-	return tsm.New(channels, analysisHop, synthesisHop, frameSize, nil, window.Hanning(frameSize), olaConverter{})
+func New(channels int, analysisHop int, synthesisHop int, frameLength int) (*tsm.TSM, error) {
+	return tsm.New(tsm.Settings{
+		Channels:        channels,
+		AnalysisHop:     analysisHop,
+		SynthesisHop:    synthesisHop,
+		FrameLength:     frameLength,
+		SynthesisWindow: window.Hanning(frameLength),
+		Converter:       olaConverter{},
+	})
 }
 
 // NewWithSpeed returns a TSM implementing the OLA procedure, modifying the
 // sped of the input signal by the ratio speed.
 //
-// The arguments speed, synthesisHop, frameSize may be equal to zero, in which
+// The arguments speed, synthesisHop, frameLength may be equal to zero, in which
 // case they will be replaced by default values.
-func NewWithSpeed(channels int, speed float64, synthesisHop int, frameSize int) (*tsm.TSM, error) {
+func NewWithSpeed(channels int, speed float64, synthesisHop int, frameLength int) (*tsm.TSM, error) {
 	if speed == 0 {
 		speed = 1
 	}
-	if frameSize == 0 {
-		frameSize = 256
+	if frameLength == 0 {
+		frameLength = 256
 	}
 	if synthesisHop == 0 {
-		synthesisHop = frameSize / 2
+		synthesisHop = frameLength / 2
 	}
 
 	analysisHop := int(float64(synthesisHop) * speed)
 
-	return New(channels, analysisHop, synthesisHop, frameSize)
+	return New(channels, analysisHop, synthesisHop, frameLength)
 }
 
 // Default returns a TSM implementing the OLA procedure with sane default
