@@ -35,15 +35,15 @@ import (
 type olaConverter struct{}
 
 // Convert returns the analysisFrame without modifying it.
-func (o olaConverter) Convert(analysisFrame multichannel.TSMBuffer) multichannel.TSMBuffer {
+func (c olaConverter) Convert(analysisFrame multichannel.TSMBuffer) multichannel.TSMBuffer {
 	return analysisFrame
 }
 
 // New returns a TSM implementing the OLA procedure.
 //
 // channels is the number of channels of the signal that the TSM will process.
-// Read the documentation of the TSM type above for an explanation of the other
-// arguments.
+// Read the documentation of the tsm.Settings type for an explanation of the
+// other arguments.
 func New(channels int, analysisHop int, synthesisHop int, frameLength int) (*tsm.TSM, error) {
 	return tsm.New(tsm.Settings{
 		Channels:        channels,
@@ -56,18 +56,18 @@ func New(channels int, analysisHop int, synthesisHop int, frameLength int) (*tsm
 }
 
 // NewWithSpeed returns a TSM implementing the OLA procedure, modifying the
-// sped of the input signal by the ratio speed.
+// speed of the input signal by the ratio speed.
 //
-// The arguments speed, synthesisHop, frameLength may be equal to zero, in which
-// case they will be replaced by default values.
+// The arguments speed, synthesisHop and frameLength may be strictly negative, in
+// which case they will be replaced by default values.
 func NewWithSpeed(channels int, speed float64, synthesisHop int, frameLength int) (*tsm.TSM, error) {
-	if speed == 0 {
+	if speed < 0 {
 		speed = 1
 	}
-	if frameLength == 0 {
+	if frameLength < 0 {
 		frameLength = 256
 	}
-	if synthesisHop == 0 {
+	if synthesisHop < 0 {
 		synthesisHop = frameLength / 2
 	}
 
@@ -79,5 +79,5 @@ func NewWithSpeed(channels int, speed float64, synthesisHop int, frameLength int
 // Default returns a TSM implementing the OLA procedure with sane default
 // parameters.
 func Default(channels int, speed float64) (*tsm.TSM, error) {
-	return NewWithSpeed(channels, speed, 0, 0)
+	return NewWithSpeed(channels, speed, -1, -1)
 }

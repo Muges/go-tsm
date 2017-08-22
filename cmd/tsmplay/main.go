@@ -35,9 +35,9 @@ import (
 var (
 	app = kingpin.New("tsmplay", "Change the speed of a WAV audio file.")
 
-	speed          = app.Flag("speed", "Change the speed by N percents (100 by default).").Short('s').PlaceHolder("N").Float64()
-	frameLength    = app.Flag("frame_length", "Set the frame length to N.").Short('l').PlaceHolder("N").Int()
-	synthesisHop   = app.Flag("synthesis_hop", "Set the synthesis hop to N.").PlaceHolder("N").Int()
+	speed          = app.Flag("speed", "Change the speed by N percents (100 by default).").Short('s').PlaceHolder("N").Default("-1").Float64()
+	frameLength    = app.Flag("frame_length", "Set the frame length to N.").Short('l').PlaceHolder("N").Default("-1").Int()
+	synthesisHop   = app.Flag("synthesis_hop", "Set the synthesis hop to N.").PlaceHolder("N").Default("-1").Int()
 	outputFilename = app.Flag("output", "Save the stretched audio to FILENAME instead of playing it.").Short('o').PlaceHolder("FILENAME").String()
 
 	inputFilename = app.Arg("filename", "A wav file.").Required().ExistingFile()
