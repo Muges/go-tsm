@@ -18,7 +18,6 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-// TODO : the first frames may need to be handled differently to avoid fade-in
 // TODO : the last frames may need to be handled differently to avoid fade-out
 // TODO : should functions return errors?
 
@@ -85,10 +84,11 @@ type TSM struct {
 	converter       Converter
 
 	// When analysisHop is larger than frameSize, some samples from the input
-	// need to be skipped. skipSamples tracks how many samples should be
+	// need to be skipped. skipInputSamples tracks how many samples should be
 	// skipped before reading the analysis frame.
-	skipSamples     int
-	normalizeWindow []float64
+	skipInputSamples  int
+	normalizeWindow   []float64
+	skipOutputSamples int
 
 	inBuffer        multichannel.CBuffer
 	analysisFrame   multichannel.TSMBuffer
@@ -102,13 +102,12 @@ type TSM struct {
 // Read the documentation of the TSM type above for an explanation of the other
 // arguments.
 func New(channels int, analysisHop int, synthesisHop int, frameSize int, analysisWindow []float64, synthesisWindow []float64, converter Converter) (*TSM, error) {
-
 	normalizeWindow, err := window.Product(analysisWindow, synthesisWindow)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create normalizeWindow")
 	}
 
-	return &TSM{
+	t := &TSM{
 		analysisHop:     analysisHop,
 		synthesisHop:    synthesisHop,
 		frameSize:       frameSize,
@@ -122,7 +121,26 @@ func New(channels int, analysisHop int, synthesisHop int, frameSize int, analysi
 		analysisFrame:   multichannel.NewTSMBuffer(channels, frameSize),
 		outBuffer:       multichannel.NewCBuffer(channels, frameSize),
 		normalizeBuffer: multichannel.NewNormalizeBuffer(frameSize),
-	}, nil
+	}
+	t.Clear()
+
+	return t, nil
+}
+
+// Clear clears the state of the TSM object, making it ready to be used on
+// another signal (or another part of a signal). It is automatically called by
+// Flush.
+func (t *TSM) Clear() {
+	// Clear the buffers
+	t.inBuffer.Remove(t.frameSize)
+	t.outBuffer.Remove(t.frameSize)
+	t.normalizeBuffer.Remove(t.frameSize)
+
+	// Left pad the input with half a frame of zeros, and ignore that half
+	// frame in the output. This makes the output signal start in the middle of
+	// a frame, which should be the peak of the window function.
+	t.inBuffer.SetReadable(t.frameSize / 2)
+	t.skipOutputSamples = t.frameSize / 2
 }
 
 // Flush writes the last output samples to the buffer, assuming that no samples
@@ -145,22 +163,31 @@ func (t *TSM) Flush(buffer multichannel.Buffer) int {
 // read.
 func (t *TSM) Put(buffer multichannel.Buffer) int {
 	n := 0
-	if t.skipSamples >= buffer.Len() {
+	if t.skipInputSamples >= buffer.Len() {
 		// All the samples in the buffer have to be skipped
 		n = buffer.Len()
 	} else {
-		n := t.skipSamples
-		n += t.inBuffer.Write(buffer.Slice(t.skipSamples, buffer.Len()))
+		n := t.skipInputSamples
+		n += t.inBuffer.Write(buffer.Slice(t.skipInputSamples, buffer.Len()))
 	}
-	t.skipSamples -= n
+	t.skipInputSamples -= n
 
 	if t.inBuffer.Len() >= t.frameSize && t.outBuffer.RemainingSpace() >= t.frameSize {
 		// The input buffer has enough data to process, and there is enough
 		// space in the output buffer to put the result.
 		t.processFrame()
-		t.skipSamples = t.analysisHop - t.frameSize
-		if t.skipSamples < 0 {
-			t.skipSamples = 0
+
+		if t.skipOutputSamples > t.outBuffer.Len() {
+			t.skipOutputSamples -= t.outBuffer.Len()
+			t.outBuffer.Remove(t.outBuffer.Len())
+		} else if t.skipOutputSamples > 0 {
+			t.outBuffer.Remove(t.skipOutputSamples)
+			t.skipOutputSamples = 0
+		}
+
+		t.skipInputSamples = t.analysisHop - t.frameSize
+		if t.skipInputSamples < 0 {
+			t.skipInputSamples = 0
 		}
 	}
 
@@ -215,5 +242,5 @@ func (t *TSM) processFrame() {
 // buffer, i.e. the number of samples that can be added to each channel of the
 // buffer.
 func (t *TSM) RemainingInputSpace() int {
-	return t.skipSamples + t.inBuffer.RemainingSpace()
+	return t.skipInputSamples + t.inBuffer.RemainingSpace()
 }
