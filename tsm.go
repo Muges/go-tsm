@@ -88,7 +88,13 @@ type Settings struct {
 	FrameLength     int
 	AnalysisWindow  []float64
 	SynthesisWindow []float64
-	Converter       Converter
+
+	// Some TSM methods (such as WSOLA) may need to have access to samples
+	// before and after the analysis frame.
+	DeltaBefore int
+	DeltaAfter  int
+
+	Converter Converter
 }
 
 // A TSM is an object implementing a Time-Scale Modification procedure.
@@ -96,7 +102,7 @@ type Settings struct {
 type TSM struct {
 	s Settings
 
-	// When analysisHop is larger than frameLength, some samples from the input
+	// When AnalysisHop is larger than FrameLength, some samples from the input
 	// need to be skipped. skipInputSamples tracks how many samples should be
 	// skipped before reading the analysis frame.
 	skipInputSamples  int
@@ -125,8 +131,8 @@ func New(s Settings) (*TSM, error) {
 
 		normalizeWindow: normalizeWindow,
 
-		inBuffer:        multichannel.NewCBuffer(s.Channels, s.FrameLength),
-		analysisFrame:   multichannel.NewTSMBuffer(s.Channels, s.FrameLength),
+		inBuffer:        multichannel.NewCBuffer(s.Channels, s.DeltaBefore+s.FrameLength+s.DeltaAfter),
+		analysisFrame:   multichannel.NewTSMBuffer(s.Channels, s.DeltaBefore+s.FrameLength+s.DeltaAfter),
 		outBuffer:       multichannel.NewCBuffer(s.Channels, s.FrameLength),
 		normalizeBuffer: multichannel.NewNormalizeBuffer(s.FrameLength),
 	}
@@ -147,7 +153,7 @@ func (t *TSM) Clear() {
 	// Left pad the input with half a frame of zeros, and ignore that half
 	// frame in the output. This makes the output signal start in the middle of
 	// a frame, which should be the peak of the window function.
-	t.inBuffer.SetReadable(t.s.FrameLength / 2)
+	t.inBuffer.SetReadable(t.s.DeltaBefore + t.s.FrameLength/2)
 	t.skipOutputSamples = t.s.FrameLength / 2
 }
 
@@ -185,7 +191,7 @@ func (t *TSM) Put(buffer multichannel.Buffer) int {
 	}
 	t.skipInputSamples -= n
 
-	if t.inBuffer.Len() >= t.s.FrameLength && t.outBuffer.RemainingSpace() >= t.s.FrameLength {
+	if t.inBuffer.RemainingSpace() == 0 && t.outBuffer.RemainingSpace() >= t.s.FrameLength {
 		// The input buffer has enough data to process, and there is enough
 		// space in the output buffer to put the result.
 		t.processFrame()
