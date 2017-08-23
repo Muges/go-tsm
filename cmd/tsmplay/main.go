@@ -21,9 +21,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"github.com/Muges/tsm"
 	"github.com/Muges/tsm/ola"
 	"github.com/Muges/tsm/streamer"
+	"github.com/Muges/tsm/wsola"
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/speaker"
 	"github.com/faiface/beep/wav"
@@ -36,8 +39,10 @@ var (
 	app = kingpin.New("tsmplay", "Change the speed of a WAV audio file.")
 
 	speed          = app.Flag("speed", "Change the speed by N percents (100 by default).").Short('s').PlaceHolder("N").Default("-1").Float64()
+	method         = app.Flag("method", "Change the TSM method (ola or wsola).").Short('m').PlaceHolder("METHOD").Default("wsola").Enum("ola", "wsola")
 	frameLength    = app.Flag("frame_length", "Set the frame length to N.").Short('l').PlaceHolder("N").Default("-1").Int()
 	synthesisHop   = app.Flag("synthesis_hop", "Set the synthesis hop to N.").PlaceHolder("N").Default("-1").Int()
+	tolerance      = app.Flag("tolerance", "Set the tolerance for the WSOLA procedure to N.").Short('t').PlaceHolder("N").Default("-1").Int()
 	outputFilename = app.Flag("output", "Save the stretched audio to FILENAME instead of playing it.").Short('o').PlaceHolder("FILENAME").String()
 
 	inputFilename = app.Arg("filename", "A wav file.").Required().ExistingFile()
@@ -64,8 +69,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Set default values
-	t, err := ola.NewWithSpeed(2, *speed, *synthesisHop, *frameLength)
+	// Create TSM object
+	var t *tsm.TSM
+	switch *method {
+	case "ola":
+		t, err = ola.NewWithSpeed(2, *speed, *synthesisHop, *frameLength)
+	case "wsola":
+		t, err = wsola.NewWithSpeed(2, *speed, *synthesisHop, *frameLength, *tolerance)
+	default:
+		err = errors.New(fmt.Sprintf("Unknown TSM method \"%s\"", *method))
+	}
 	if err != nil {
 		fmt.Println("error: unable to create the TSM object")
 		fmt.Println(err)
