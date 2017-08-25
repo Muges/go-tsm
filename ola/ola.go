@@ -39,6 +39,13 @@ func (c olaConverter) Convert(analysisFrame multichannel.TSMBuffer) multichannel
 	return analysisFrame
 }
 
+// Clear clears the state of the Converter, making it ready to be used on
+// another signal (or another part of a signal). It is automatically called by
+// the Flush, Clear and New methods of the TSM object.
+func (c olaConverter) Clear() {
+	return
+}
+
 // New returns a TSM implementing the OLA procedure.
 //
 // channels is the number of channels of the signal that the TSM will process.

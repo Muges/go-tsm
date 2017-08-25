@@ -92,6 +92,18 @@ func (c *wsolaConverter) Convert(analysisFrame multichannel.TSMBuffer) multichan
 	return synthesisFrame
 }
 
+// Clear clears the state of the Converter, making it ready to be used on
+// another signal (or another part of a signal). It is automatically called by
+// the Flush, Clear and New methods of the TSM object.
+func (c *wsolaConverter) Clear() {
+	// Reset the natural progression
+	for k := range c.naturalProgression {
+		for i := range c.naturalProgression[k] {
+			c.naturalProgression[k][i] = 0
+		}
+	}
+}
+
 // New returns a TSM implementing the WSOLA procedure.
 //
 // channels is the number of channels of the signal that the TSM will process.

@@ -35,7 +35,13 @@ import (
 // A Converter is an object implementing the conversion of an analysis frame
 // into a synthesis frame.
 type Converter interface {
+	// Convert converts an analysis frame into a synthesis frame.
 	Convert(analysisFrame multichannel.TSMBuffer) (synthesisFrame multichannel.TSMBuffer)
+
+	// Clear clears the state of the Converter, making it ready to be used on
+	// another signal (or another part of a signal). It is automatically called
+	// by the Flush, Clear and New methods of the TSM object.
+	Clear()
 }
 
 // A Settings is a struct containing the settings for a TSM object. It is used
@@ -155,6 +161,8 @@ func (t *TSM) Clear() {
 	// a frame, which should be the peak of the window function.
 	t.inBuffer.SetReadable(t.s.DeltaBefore + t.s.FrameLength/2)
 	t.skipOutputSamples = t.s.FrameLength / 2
+
+	t.s.Converter.Clear()
 }
 
 // Flush writes the last output samples to the buffer, assuming that no samples
