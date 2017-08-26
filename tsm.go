@@ -106,7 +106,7 @@ type Settings struct {
 // A TSM is an object implementing a Time-Scale Modification procedure.
 //
 type TSM struct {
-	s Settings
+	s *Settings
 
 	// When AnalysisHop is larger than FrameLength, some samples from the input
 	// need to be skipped. skipInputSamples tracks how many samples should be
@@ -133,7 +133,7 @@ func New(s Settings) (*TSM, error) {
 	}
 
 	t := &TSM{
-		s: s,
+		s: &s,
 
 		normalizeWindow: normalizeWindow,
 
@@ -270,4 +270,10 @@ func (t *TSM) processFrame() {
 // buffer.
 func (t *TSM) RemainingInputSpace() int {
 	return t.skipInputSamples + t.inBuffer.RemainingSpace()
+}
+
+// SetSpeed changes the speed ratio.
+func (t *TSM) SetSpeed(speed float64) {
+	t.s.AnalysisHop = int(float64(t.s.SynthesisHop) * speed)
+
 }
