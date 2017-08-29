@@ -25,8 +25,8 @@ package multichannel
 // A TSMBuffer is a representation of a multi-channel audio buffer which
 // implements the Buffer interface and is used internally by the tsm package.
 //
-// If buffer is a StereoBuffer, the value at buffer[c][i] is the value of the
-// i-th sample of the c-th channel. Each channel should have the same number of
+// If buffer is a TSMBuffer, the value at buffer[c][i] is the value of the i-th
+// sample of the c-th channel. Each channel should have the same number of
 // samples. This representation makes it easy to work on each channel
 // individually, which is often required for time-scale modifications.
 type TSMBuffer [][]float64
