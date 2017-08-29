@@ -24,7 +24,6 @@ package streamer
 
 import (
 	"github.com/Muges/tsm"
-	"github.com/Muges/tsm/multichannel"
 	"github.com/faiface/beep"
 )
 
@@ -33,7 +32,7 @@ import (
 type TSMStreamer struct {
 	t             *tsm.TSM
 	inputStreamer beep.Streamer
-	buffer        multichannel.StereoBuffer
+	buffer        StereoBuffer
 }
 
 // New creates a new TSMSTreamer, which changes the speed of the inputStreamer
@@ -59,11 +58,11 @@ func (s TSMStreamer) Stream(samples [][2]float64) (n int, ok bool) {
 		n, ok := s.inputStreamer.Stream(s.buffer[:nmax])
 		s.t.Put(s.buffer[:n])
 
-		l := s.t.Receive(multichannel.StereoBuffer(samples[length:]))
+		l := s.t.Receive(StereoBuffer(samples[length:]))
 		length += l
 
 		if l == 0 && !ok {
-			l = s.t.Flush(multichannel.StereoBuffer(samples[length:]))
+			l = s.t.Flush(StereoBuffer(samples[length:]))
 			length += l
 
 			if l == 0 {
