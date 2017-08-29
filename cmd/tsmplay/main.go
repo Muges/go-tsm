@@ -23,9 +23,9 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/Muges/tsm"
 	"github.com/Muges/tsm/ola"
 	"github.com/Muges/tsm/streamer"
+	"github.com/Muges/tsm/tsm"
 	"github.com/Muges/tsm/wsola"
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/speaker"

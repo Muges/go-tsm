@@ -25,8 +25,8 @@
 package ola
 
 import (
-	"github.com/Muges/tsm"
 	"github.com/Muges/tsm/multichannel"
+	"github.com/Muges/tsm/tsm"
 	"github.com/Muges/tsm/window"
 )
 

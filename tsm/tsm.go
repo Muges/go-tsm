@@ -18,12 +18,8 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-// Package tsm implements several real-time time-scale modification methods,
-// i.e. algorithms that change the playback speed of an audio signal without
-// changing its pitch.
-//
-// The package tsm itself only provides a TSM object that makes it easy to
-// implement time-scale modification procedures.
+// Package tsm implements the skeleton of an analysis-synthesis based
+// time-scale modification procedure.
 package tsm
 
 import (
