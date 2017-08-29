@@ -25,9 +25,9 @@
 package ola
 
 import (
-	"github.com/Muges/tsm/multichannel"
-	"github.com/Muges/tsm/tsm"
-	"github.com/Muges/tsm/window"
+	"github.com/Muges/go-tsm/multichannel"
+	"github.com/Muges/go-tsm/tsm"
+	"github.com/Muges/go-tsm/window"
 )
 
 // An olaConverter implements the conversion of an analysis frame into a

@@ -21,7 +21,7 @@
 package streamer
 
 import (
-	"github.com/Muges/tsm/multichannel"
+	"github.com/Muges/go-tsm/multichannel"
 )
 
 // A StereoBuffer is a representation of a stereo audio buffer which implements

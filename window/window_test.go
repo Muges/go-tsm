@@ -22,7 +22,7 @@ package window_test
 
 import (
 	"fmt"
-	"github.com/Muges/tsm/window"
+	"github.com/Muges/go-tsm/window"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

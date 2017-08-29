@@ -23,7 +23,7 @@
 package streamer
 
 import (
-	"github.com/Muges/tsm/tsm"
+	"github.com/Muges/go-tsm/tsm"
 	"github.com/faiface/beep"
 )
 

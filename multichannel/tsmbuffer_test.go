@@ -22,7 +22,7 @@ package multichannel_test
 
 import (
 	"fmt"
-	"github.com/Muges/tsm/multichannel"
+	"github.com/Muges/go-tsm/multichannel"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

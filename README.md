@@ -1,6 +1,6 @@
 # TSM
 
-[![GoDoc](https://godoc.org/github.com/Muges/tsm?status.svg)](https://godoc.org/github.com/Muges/tsm) [![Build Status](https://travis-ci.org/Muges/tsm.svg?branch=master)](https://travis-ci.org/Muges/tsm)
+[![GoDoc](https://godoc.org/github.com/Muges/go-tsm?status.svg)](https://godoc.org/github.com/Muges/go-tsm) [![Build Status](https://travis-ci.org/Muges/go-tsm.svg?branch=master)](https://travis-ci.org/Muges/go-tsm)
 
 Package tsm implements several real-time time-scale modification methods, i.e. algorithms that change the playback speed of an audio signal without changing its pitch.
 

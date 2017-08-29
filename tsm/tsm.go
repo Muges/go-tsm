@@ -23,8 +23,8 @@
 package tsm
 
 import (
-	"github.com/Muges/tsm/multichannel"
-	"github.com/Muges/tsm/window"
+	"github.com/Muges/go-tsm/multichannel"
+	"github.com/Muges/go-tsm/window"
 	"github.com/pkg/errors"
 )
 
